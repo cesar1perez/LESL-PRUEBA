@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modelorama - Prueba | Control de Inventarios</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --navy:#001529;
+    --navy-light:#0a2540;
+    --yellow:#facc15;
+    --yellow-dark:#eab308;
+  }
+  *{font-family: Arial, Helvetica, sans-serif;}
+  body{background:#f3f4f6;}
+  .navy{background:var(--navy);}
+  .navy-light{background:var(--navy-light);}
+  .text-navy{color:var(--navy);}
+  .yellow-bg{background:var(--yellow);}
+  .yellow-text{color:var(--yellow);}
+  .border-yellow{border-color:var(--yellow);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:4px;}
+  .nav-item{transition:.15s;}
+  .nav-item:hover{background:rgba(250,204,21,.12);}
+  .nav-item.active{background:var(--yellow);color:var(--navy)!important;font-weight:700;}
+  .kpi-card{background:#fff;border-radius:.75rem;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .badge{display:inline-block;padding:.15rem .55rem;border-radius:9999px;font-size:.7rem;font-weight:700;}
+  .badge-ok{background:#dcfce7;color:#166534;}
+  .badge-warn{background:#fef9c3;color:#854d0e;}
+  .badge-danger{background:#fee2e2;color:#991b1b;}
+  .modal-bg{background:rgba(0,21,41,.55);}
+  table{border-collapse:collapse;width:100%;}
+  th{background:#f8fafc;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:#475569;position:sticky;top:0;}
+  th,td{padding:.55rem .65rem;border-bottom:1px solid #eef1f4;font-size:.85rem;text-align:left;white-space:nowrap;}
+  tr:hover td{background:#fafbfc;}
+  .card{background:#fff;border-radius:.75rem;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:1rem;}
+  .btn{padding:.5rem 1rem;border-radius:.5rem;font-weight:600;font-size:.85rem;transition:.15s;cursor:pointer;border:none;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:hover{background:var(--navy-light);}
+  .btn-yellow{background:var(--yellow);color:var(--navy);}
+  .btn-yellow:hover{background:var(--yellow-dark);}
+  .btn-outline{background:#fff;border:1.5px solid #cbd5e1;color:#334155;}
+  .btn-outline:hover{border-color:var(--navy);}
+  .btn-danger{background:#fee2e2;color:#991b1b;}
+  .btn-danger:hover{background:#fecaca;}
+  input[type=text],input[type=number],input[type=date],input[type=url],input[type=password],select,textarea{
+    border:1.5px solid #e2e8f0;border-radius:.5rem;padding:.5rem .65rem;font-size:.85rem;width:100%;background:#fff;
+  }
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);}
+  label{font-size:.75rem;font-weight:700;color:#475569;display:block;margin-bottom:.2rem;}
+  .section{display:none;}
+  .section.active{display:block;}
+  .tab-btn{padding:.4rem .9rem;border-radius:.5rem;font-size:.8rem;font-weight:600;color:#475569;cursor:pointer;}
+  .tab-btn.active{background:var(--navy);color:#fff;}
+  @media print{
+    .no-print{display:none!important;}
+    body{background:#fff;}
+    .print-area{box-shadow:none!important;}
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- TOP BAR (mobile) -->
+<div class="navy no-print flex items-center justify-between px-4 py-3 lg:hidden sticky top-0 z-30">
+  <div class="flex items-center gap-2">
+    <span class="yellow-bg text-navy font-black rounded px-2 py-1 text-sm">MP</span>
+    <div>
+      <p class="text-white font-bold text-sm leading-tight">Modelorama - Prueba</p>
+      <p class="text-yellow text-[10px] leading-tight">Control de Inventarios</p>
+    </div>
+  </div>
+  <button id="hamburger" class="text-white text-2xl leading-none">&#9776;</button>
+</div>
+
+<div class="flex">
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="no-print navy w-64 min-h-screen fixed lg:sticky top-0 left-0 z-40 -translate-x-full lg:translate-x-0 transition-transform duration-200 flex flex-col">
+    <div class="hidden lg:flex items-center gap-2 px-5 py-5 border-b border-white/10">
+      <span class="yellow-bg text-navy font-black rounded px-2 py-1 text-sm">MP</span>
+      <div>
+        <p class="text-white font-bold text-sm leading-tight">Modelorama - Prueba</p>
+        <p class="text-yellow text-[10px] leading-tight">Control de Inventarios</p>
+      </div>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto" id="navMenu">
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="dashboard">
+        <span>📊</span><span>Dashboard</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="productos">
+        <span>📦</span><span>Productos</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="entradas">
+        <span>⬇️</span><span>Entradas</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="salidas">
+        <span>🧾</span><span>Salidas / Venta</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="movimientos">
+        <span>🔄</span><span>Movimientos</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="reportes">
+        <span>📈</span><span>Reportes</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="recomendaciones">
+        <span>💡</span><span>Recomendaciones</span>
+      </div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="config">
+        <span>⚙️</span><span>Configuración</span>
+      </div>
+    </nav>
+    <div class="px-4 py-3 border-t border-white/10 text-[10px] text-white/50">
+      <p id="syncStatus">Sin sincronizar</p>
+    </div>
+  </aside>
+  <div id="overlay" class="fixed inset-0 bg-black/40 z-30 hidden lg:hidden"></div>
+
+  <!-- MAIN -->
+  <main class="flex-1 min-h-screen p-4 lg:p-8 max-w-[1400px] mx-auto w-full">
+
+    <!-- DASHBOARD -->
+    <section id="view-dashboard" class="section active">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h1 class="text-xl lg:text-2xl font-black text-navy">Dashboard</h1>
+          <p class="text-sm text-slate-500">Resumen general del inventario</p>
+        </div>
+        <button class="btn btn-yellow no-print" onclick="showView('salidas')">+ Nueva venta</button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-6" id="kpiCards"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="card">
+          <p class="font-bold text-navy mb-2 text-sm">Top 5 productos más vendidos (30 días)</p>
+          <canvas id="chartTop" height="220"></canvas>
+        </div>
+        <div class="card">
+          <p class="font-bold text-navy mb-2 text-sm">Entradas vs Salidas (últimos 7 días)</p>
+          <canvas id="chartFlow" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="flex items-center justify-between mb-2">
+          <p class="font-bold text-navy text-sm">⚠️ Alertas de stock bajo</p>
+          <button class="text-xs text-navy underline no-print" onclick="showView('recomendaciones')">Ver recomendaciones</button>
+        </div>
+        <div class="overflow-x-auto"><table id="tblAlertas"></table></div>
+      </div>
+    </section>
+
+    <!-- PRODUCTOS -->
+    <section id="view-productos" class="section">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h1 class="text-xl lg:text-2xl font-black text-navy">Productos</h1>
+          <p class="text-sm text-slate-500">Catálogo y existencias actuales</p>
+        </div>
+        <button class="btn btn-primary no-print" onclick="openProductoModal()">+ Nuevo producto</button>
+      </div>
+      <div class="card mb-4 no-print">
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[160px]"><label>Buscar</label><input type="text" id="fProdBuscar" placeholder="Nombre o código" oninput="renderProductos()"></div>
+          <div class="min-w-[150px]"><label>Categoría</label><select id="fProdCat" onchange="renderProductos()"><option value="">Todas</option></select></div>
+          <div class="min-w-[150px]"><label>Estado</label><select id="fProdEstado" onchange="renderProductos()">
+            <option value="">Todos</option><option value="1">Activos</option><option value="0">Inactivos</option>
+          </select></div>
+          <button class="btn btn-outline" onclick="exportCSV(getProductosFiltrados().map(p=>({...p})),'productos.csv')">Exportar CSV</button>
+        </div>
+      </div>
+      <div class="card overflow-x-auto"><table id="tblProductos"></table></div>
+    </section>
+
+    <!-- ENTRADAS -->
+    <section id="view-entradas" class="section">
+      <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Entradas de existencias</h1>
+      <p class="text-sm text-slate-500 mb-4">Registra compras, reabastecimientos o ajustes positivos</p>
+      <div class="card mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+          <div class="md:col-span-2"><label>Producto</label><select id="eProducto" onchange="onEntradaProductoChange()"></select></div>
+          <div><label>Cantidad</label><input type="number" id="eCantidad" min="0" step="1"></div>
+          <div><label>Costo unitario</label><input type="number" id="eCosto" min="0" step="0.01"></div>
+          <div><label>Proveedor</label><input type="text" id="eProveedor" placeholder="Opcional"></div>
+          <div><label>Fecha</label><input type="date" id="eFecha"></div>
+          <div class="md:col-span-5"><label>Motivo / nota</label><input type="text" id="eMotivo" placeholder="Ej. Compra semanal, ajuste de inventario..."></div>
+          <div class="flex items-end"><button class="btn btn-primary w-full" onclick="registrarEntrada()">Registrar entrada</button></div>
+        </div>
+      </div>
+      <div class="card overflow-x-auto">
+        <p class="font-bold text-navy text-sm mb-2">Últimas entradas</p>
+        <table id="tblEntradas"></table>
+      </div>
+    </section>
+
+    <!-- SALIDAS / POS -->
+    <section id="view-salidas" class="section">
+      <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Salidas / Punto de Venta</h1>
+      <p class="text-sm text-slate-500 mb-4">Registra ventas, mermas, consumo interno o ajustes</p>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 card">
+          <div class="flex flex-wrap gap-3 mb-3">
+            <div class="flex-1 min-w-[200px]"><label>Buscar producto</label>
+              <input type="text" id="posBuscar" placeholder="Nombre o código..." oninput="renderPosResultados()" onfocus="renderPosResultados()">
+              <div id="posResultados" class="relative"></div>
+            </div>
+            <div class="w-28"><label>Cantidad</label><input type="number" id="posCantidad" value="1" min="1" step="1"></div>
+            <div class="flex items-end"><button class="btn btn-yellow" onclick="agregarAlCarrito()">Agregar</button></div>
+          </div>
+          <div class="overflow-x-auto"><table id="tblCarrito"></table></div>
+        </div>
+        <div class="card h-fit">
+          <p class="font-bold text-navy text-sm mb-2">Resumen</p>
+          <div class="mb-3">
+            <label>Tipo de salida</label>
+            <select id="posTipo">
+              <option value="Venta">Venta</option>
+              <option value="Merma">Merma</option>
+              <option value="Consumo interno">Consumo interno</option>
+              <option value="Ajuste">Ajuste de inventario</option>
+            </select>
+          </div>
+          <div class="mb-3"><label>Cliente / nota</label><input type="text" id="posCliente" placeholder="Opcional"></div>
+          <div class="flex items-center justify-between text-sm mb-1"><span class="text-slate-500">Artículos</span><span id="posCount" class="font-bold">0</span></div>
+          <div class="flex items-center justify-between text-lg mb-4"><span class="font-bold text-navy">Total</span><span id="posTotal" class="font-black text-navy">$0.00</span></div>
+          <button class="btn btn-primary w-full mb-2" onclick="confirmarSalida()">Confirmar salida</button>
+          <button class="btn btn-outline w-full" onclick="limpiarCarrito()">Vaciar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MOVIMIENTOS -->
+    <section id="view-movimientos" class="section">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h1 class="text-xl lg:text-2xl font-black text-navy">Movimientos</h1>
+          <p class="text-sm text-slate-500">Historial completo de entradas y salidas</p>
+        </div>
+        <div class="flex gap-2 no-print">
+          <button class="btn btn-outline" onclick="exportCSV(getMovimientosFiltrados(),'movimientos.csv')">Exportar CSV</button>
+          <button class="btn btn-outline" onclick="window.print()">Imprimir</button>
+        </div>
+      </div>
+      <div class="card mb-4 no-print">
+        <div class="flex flex-wrap gap-3 items-end">
+          <div><label>Desde</label><input type="date" id="fMovDesde" onchange="renderMovimientos()"></div>
+          <div><label>Hasta</label><input type="date" id="fMovHasta" onchange="renderMovimientos()"></div>
+          <div><label>Tipo</label><select id="fMovTipo" onchange="renderMovimientos()"><option value="">Todos</option><option>Entrada</option><option>Salida</option></select></div>
+          <div class="flex-1 min-w-[160px]"><label>Producto / código</label><input type="text" id="fMovBuscar" oninput="renderMovimientos()"></div>
+        </div>
+      </div>
+      <div class="card overflow-x-auto print-area"><table id="tblMovimientos"></table></div>
+    </section>
+
+    <!-- REPORTES -->
+    <section id="view-reportes" class="section">
+      <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Reportes</h1>
+      <p class="text-sm text-slate-500 mb-4">Valuación, stock bajo, rotación y ventas por periodo</p>
+      <div class="flex gap-2 mb-4 no-print flex-wrap">
+        <div class="tab-btn active" data-rep="valuacion" onclick="showReporte('valuacion')">Valuación</div>
+        <div class="tab-btn" data-rep="stockbajo" onclick="showReporte('stockbajo')">Stock bajo</div>
+        <div class="tab-btn" data-rep="rotacion" onclick="showReporte('rotacion')">Rotación / Top</div>
+        <div class="tab-btn" data-rep="ventas" onclick="showReporte('ventas')">Ventas por periodo</div>
+      </div>
+
+      <div id="rep-valuacion" class="rep-panel">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4" id="repValKpis"></div>
+        <div class="card overflow-x-auto print-area"><table id="tblValuacion"></table></div>
+      </div>
+      <div id="rep-stockbajo" class="rep-panel hidden">
+        <div class="flex justify-end mb-2 no-print"><button class="btn btn-outline" onclick="window.print()">Imprimir reporte</button></div>
+        <div class="card overflow-x-auto print-area"><table id="tblStockBajoRep"></table></div>
+      </div>
+      <div id="rep-rotacion" class="rep-panel hidden">
+        <div class="card mb-4"><canvas id="chartRotacion" height="200"></canvas></div>
+        <div class="card overflow-x-auto"><table id="tblRotacion"></table></div>
+      </div>
+      <div id="rep-ventas" class="rep-panel hidden">
+        <div class="flex flex-wrap gap-3 mb-4 items-end no-print">
+          <div><label>Agrupar por</label><select id="ventasAgrupacion" onchange="renderReporteVentas()"><option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option></select></div>
+        </div>
+        <div class="card mb-4"><canvas id="chartVentasPeriodo" height="220"></canvas></div>
+        <div class="card overflow-x-auto"><table id="tblVentasPeriodo"></table></div>
+      </div>
+    </section>
+
+    <!-- RECOMENDACIONES -->
+    <section id="view-recomendaciones" class="section">
+      <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Recomendaciones de surtido</h1>
+      <p class="text-sm text-slate-500 mb-4">Sugerencias de compra según consumo histórico y stock mínimo</p>
+      <div class="card mb-4 no-print">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <div><label>Ventana de análisis (días)</label><input type="number" id="recVentana" value="30" min="7"></div>
+          <div><label>Días de entrega proveedor</label><input type="number" id="recEntrega" value="7" min="0"></div>
+          <div><label>Días colchón de seguridad</label><input type="number" id="recColchon" value="5" min="0"></div>
+          <div><button class="btn btn-primary w-full" onclick="renderRecomendaciones()">Recalcular</button></div>
+        </div>
+      </div>
+      <div class="card overflow-x-auto mb-4 print-area"><table id="tblRecomendaciones"></table></div>
+      <div class="no-print"><button class="btn btn-yellow" onclick="generarOrdenCompra()">📋 Generar orden de compra sugerida</button></div>
+      <div id="ordenCompraArea" class="mt-4"></div>
+    </section>
+
+    <!-- CONFIGURACION -->
+    <section id="view-config" class="section">
+      <h1 class="text-xl lg:text-2xl font-black text-navy mb-4">Configuración</h1>
+
+      <div class="card mb-4">
+        <p class="font-bold text-navy mb-2 text-sm">Datos de la persona que captura</p>
+        <div class="max-w-sm"><label>Nombre / usuario</label><input type="text" id="cfgUsuario" placeholder="Ej. Srita. Recepción"></div>
+        <button class="btn btn-outline mt-3" onclick="guardarConfigGeneral()">Guardar</button>
+      </div>
+
+      <div class="card mb-4">
+        <p class="font-bold text-navy mb-2 text-sm">Sincronización con Google Sheets (Apps Script)</p>
+        <p class="text-xs text-slate-500 mb-2">Pega aquí la URL del Web App de Apps Script (deployment) para respaldar productos y movimientos en el Google Sheet.</p>
+        <input type="url" id="cfgAppsScriptUrl" placeholder="https://script.google.com/macros/s/XXXX/exec" class="mb-3">
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-outline" onclick="guardarAppsScriptUrl()">Guardar URL</button>
+          <button class="btn btn-primary" onclick="sincronizarPendientes()">Sincronizar ahora (<span id="pendCount">0</span> pendientes)</button>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">Nota: por restricciones del navegador (CORS), no se puede confirmar 100% la respuesta del Apps Script; verifica en el Sheet que los datos llegaron.</p>
+      </div>
+
+      <div class="card mb-4">
+        <p class="font-bold text-navy mb-2 text-sm">Importar catálogo desde CSV publicado</p>
+        <p class="text-xs text-slate-500 mb-2">Formato esperado de columnas: Codigo, Nombre, Categoria, Unidad, PrecioCompra, PrecioVenta, StockMinimo, StockInicial, Proveedor</p>
+        <input type="url" id="cfgCsvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv" class="mb-3">
+        <button class="btn btn-outline" onclick="importarProductosCSV()">Importar productos</button>
+      </div>
+
+      <div class="card mb-4">
+        <p class="font-bold text-navy mb-2 text-sm">Respaldo local</p>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-outline" onclick="exportarRespaldo()">Exportar respaldo (.json)</button>
+          <label class="btn btn-outline cursor-pointer">Importar respaldo
+            <input type="file" id="cfgImportFile" accept=".json" class="hidden" onchange="importarRespaldo(event)">
+          </label>
+        </div>
+      </div>
+
+      <div class="card border border-red-200">
+        <p class="font-bold text-red-700 mb-2 text-sm">Zona de riesgo</p>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-outline" onclick="cargarDatosEjemplo()">Cargar datos de ejemplo</button>
+          <button class="btn btn-danger" onclick="borrarTodo()">Borrar todos los datos</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modalBg" class="modal-bg fixed inset-0 z-50 hidden items-center justify-center p-4">
+  <div id="modalBox" class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"></div>
+</div>
+
+<div id="toast" class="fixed bottom-4 right-4 z-50 hidden"></div>
+
+<script>
+/* ==================== ESTADO Y PERSISTENCIA ==================== */
+const LS = {
+  productos: 'modelorama_productos',
+  movimientos: 'modelorama_movimientos',
+  config: 'modelorama_config',
+  pending: 'modelorama_pending_sync'
+};
+
+function load(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } }
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+let productos = load(LS.productos, []);
+let movimientos = load(LS.movimientos, []);
+let config = load(LS.config, {usuario:'', appsScriptUrl:'https://script.google.com/macros/s/AKfycbzeWYCqH5Gyf-UB2j1SWizr3Luidk0AptPwiMCF3kZUUs47QHMEEM8ccGeNjVQZhFjOsQ/exec', permitirNegativo:false});
+let pending = load(LS.pending, []);
+let carrito = [];
+
+function uid(prefix){ return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function money(n){ return '$' + (Number(n)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function toast(msg, ok=true){
+  const t = document.getElementById('toast');
+  t.innerHTML = `<div class="${ok?'bg-navy':'bg-red-600'} text-white px-4 py-2.5 rounded-lg shadow-lg text-sm font-semibold">${msg}</div>`;
+  t.classList.remove('hidden');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>t.classList.add('hidden'), 2600);
+}
+
+/* ==================== NAVEGACION ==================== */
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click', ()=> showView(el.dataset.view));
+});
+function showView(view){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.view===view));
+  document.getElementById('sidebar').classList.add('-translate-x-full');
+  document.getElementById('overlay').classList.add('hidden');
+  if(view==='dashboard') renderDashboard();
+  if(view==='productos') renderProductos();
+  if(view==='entradas') renderEntradasView();
+  if(view==='salidas') renderSalidasView();
+  if(view==='movimientos') renderMovimientos();
+  if(view==='reportes') { renderReporteValuacion(); }
+  if(view==='recomendaciones') renderRecomendaciones();
+  if(view==='config') renderConfigView();
+}
+document.getElementById('hamburger').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.toggle('-translate-x-full');
+  document.getElementById('overlay').classList.toggle('hidden');
+});
+document.getElementById('overlay').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.add('-translate-x-full');
+  document.getElementById('overlay').classList.add('hidden');
+});
+
+/* ==================== MODAL GENERICO ==================== */
+function openModal(html){
+  document.getElementById('modalBox').innerHTML = html;
+  document.getElementById('modalBg').classList.remove('hidden');
+  document.getElementById('modalBg').classList.add('flex');
+}
+function closeModal(){
+  document.getElementById('modalBg').classList.add('hidden');
+  document.getElementById('modalBg').classList.remove('flex');
+}
+document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeModal(); });
+
+/* ==================== SYNC (APPS SCRIPT) ==================== */
+function queueSync(tipo, payload){
+  pending.push({id: uid('sync'), tipo, payload, ts: new Date().toISOString()});
+  save(LS.pending, pending);
+  updatePendingBadge();
+}
+function updatePendingBadge(){
+  const el = document.getElementById('pendCount');
+  if(el) el.textContent = pending.length;
+  document.getElementById('syncStatus').textContent = pending.length ? `${pending.length} cambios sin sincronizar` : 'Todo sincronizado';
+}
+async function sincronizarPendientes(){
+  if(!config.appsScriptUrl){ toast('Primero guarda la URL de Apps Script en Configuración', false); return; }
+  if(!pending.length){ toast('No hay cambios pendientes'); return; }
+  toast(`Sincronizando ${pending.length} cambios...`);
+  for(const item of [...pending]){
+    try{
+      await fetch(config.appsScriptUrl, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({tipo:item.tipo, payload:item.payload})
+      });
+      pending = pending.filter(p=>p.id!==item.id);
+    }catch(e){ console.error(e); }
+  }
+  save(LS.pending, pending);
+  updatePendingBadge();
+  toast('Sincronización enviada. Verifica el Google Sheet.');
+}
+
+/* ==================== PRODUCTOS ==================== */
+function categorias(){
+  return [...new Set(productos.map(p=>p.categoria).filter(Boolean))].sort();
+}
+function getProducto(id){ return productos.find(p=>p.id===id); }
+
+function openProductoModal(id){
+  const p = id ? getProducto(id) : null;
+  openModal(`
+    <div class="p-5">
+      <h3 class="font-black text-navy text-lg mb-4">${p?'Editar producto':'Nuevo producto'}</h3>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label>Código</label><input type="text" id="mCodigo" value="${p?p.codigo:''}" ${p?'readonly':''}></div>
+        <div><label>Categoría</label><input type="text" list="dlCategorias" id="mCategoria" value="${p?p.categoria:''}" placeholder="Ej. Cerveza, Refresco...">
+          <datalist id="dlCategorias">${categorias().map(c=>`<option value="${c}">`).join('')}</datalist>
+        </div>
+        <div class="col-span-2"><label>Nombre</label><input type="text" id="mNombre" value="${p?p.nombre:''}"></div>
+        <div><label>Unidad</label><input type="text" id="mUnidad" value="${p?p.unidad:'pieza'}" placeholder="pieza, caja, six, litro..."></div>
+        <div><label>Proveedor</label><input type="text" id="mProveedor" value="${p?p.proveedor||'':''}"></div>
+        <div><label>Precio compra</label><input type="number" step="0.01" id="mPrecioCompra" value="${p?p.precioCompra:''}"></div>
+        <div><label>Precio venta</label><input type="number" step="0.01" id="mPrecioVenta" value="${p?p.precioVenta:''}"></div>
+        <div><label>Stock mínimo</label><input type="number" step="1" id="mStockMinimo" value="${p?p.stockMinimo:5}"></div>
+        <div><label>Stock ${p?'actual':'inicial'}</label><input type="number" step="1" id="mStock" value="${p?p.stock:0}" ${p?'readonly':''}></div>
+        <div class="col-span-2 flex items-center gap-2 mt-1">
+          <input type="checkbox" id="mActivo" ${(!p||p.activo)?'checked':''} class="w-4 h-4">
+          <label class="!mb-0">Producto activo</label>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-5">
+        <button class="btn btn-primary flex-1" onclick="guardarProducto(${p?`'${p.id}'`:'null'})">Guardar</button>
+        <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+        ${p?`<button class="btn btn-danger" onclick="eliminarProducto('${p.id}')">Eliminar</button>`:''}
+      </div>
+    </div>
+  `);
+}
+function guardarProducto(id){
+  const codigo = document.getElementById('mCodigo').value.trim();
+  const nombre = document.getElementById('mNombre').value.trim();
+  if(!codigo || !nombre){ toast('Código y nombre son obligatorios', false); return; }
+  if(!id && productos.some(p=>p.codigo.toLowerCase()===codigo.toLowerCase())){ toast('Ya existe un producto con ese código', false); return; }
+  const data = {
+    codigo, nombre,
+    categoria: document.getElementById('mCategoria').value.trim() || 'Sin categoría',
+    unidad: document.getElementById('mUnidad').value.trim() || 'pieza',
+    proveedor: document.getElementById('mProveedor').value.trim(),
+    precioCompra: parseFloat(document.getElementById('mPrecioCompra').value)||0,
+    precioVenta: parseFloat(document.getElementById('mPrecioVenta').value)||0,
+    stockMinimo: parseInt(document.getElementById('mStockMinimo').value)||0,
+    activo: document.getElementById('mActivo').checked
+  };
+  if(id){
+    const p = getProducto(id);
+    Object.assign(p, data);
+    queueSync('actualizarProducto', {...p});
+    toast('Producto actualizado');
+  }else{
+    const nuevo = {id: uid('prod'), stock: parseInt(document.getElementById('mStock').value)||0, ...data};
+    productos.push(nuevo);
+    queueSync('nuevoProducto', {...nuevo});
+    toast('Producto creado');
+  }
+  save(LS.productos, productos);
+  closeModal();
+  renderProductos();
+}
+function eliminarProducto(id){
+  const p = getProducto(id);
+  const tieneHistorial = movimientos.some(m=>m.productoId===id);
+  if(tieneHistorial){
+    if(!confirm('Este producto tiene movimientos registrados. Se marcará como INACTIVO en vez de eliminarse. ¿Continuar?')) return;
+    p.activo = false;
+    save(LS.productos, productos);
+    queueSync('actualizarProducto', {...p});
+    toast('Producto marcado como inactivo');
+  }else{
+    if(!confirm(`¿Eliminar "${p.nombre}" definitivamente?`)) return;
+    productos = productos.filter(x=>x.id!==id);
+    save(LS.productos, productos);
+    queueSync('eliminarProducto', {id, codigo:p.codigo});
+    toast('Producto eliminado');
+  }
+  closeModal();
+  renderProductos();
+}
+function getProductosFiltrados(){
+  const q = (document.getElementById('fProdBuscar')?.value||'').toLowerCase();
+  const cat = document.getElementById('fProdCat')?.value||'';
+  const est = document.getElementById('fProdEstado')?.value||'';
+  return productos.filter(p=>{
+    if(q && !(p.nombre.toLowerCase().includes(q)||p.codigo.toLowerCase().includes(q))) return false;
+    if(cat && p.categoria!==cat) return false;
+    if(est!=='' && String(p.activo?1:0)!==est) return false;
+    return true;
+  });
+}
+function renderProductos(){
+  const selCat = document.getElementById('fProdCat');
+  const current = selCat.value;
+  selCat.innerHTML = '<option value="">Todas</option>' + categorias().map(c=>`<option value="${c}">${c}</option>`).join('');
+  selCat.value = current;
+
+  const list = getProductosFiltrados().sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const rows = list.map(p=>{
+    const margen = p.precioVenta>0 ? (((p.precioVenta-p.precioCompra)/p.precioVenta)*100).toFixed(0)+'%' : '-';
+    const stockBadge = p.stock<=0 ? 'badge-danger' : (p.stock<=p.stockMinimo ? 'badge-warn' : 'badge-ok');
+    return `<tr>
+      <td class="font-mono text-xs">${p.codigo}</td>
+      <td class="font-semibold">${p.nombre}</td>
+      <td>${p.categoria}</td>
+      <td><span class="badge ${stockBadge}">${p.stock} ${p.unidad}</span></td>
+      <td>${p.stockMinimo}</td>
+      <td>${money(p.precioCompra)}</td>
+      <td>${money(p.precioVenta)}</td>
+      <td>${margen}</td>
+      <td>${p.activo?'<span class="badge badge-ok">Activo</span>':'<span class="badge badge-danger">Inactivo</span>'}</td>
+      <td class="no-print"><button class="text-navy underline text-xs" onclick="openProductoModal('${p.id}')">Editar</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tblProductos').innerHTML = `
+    <thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Stock</th><th>Mín.</th><th>Compra</th><th>Venta</th><th>Margen</th><th>Estado</th><th class="no-print"></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="10" class="text-center text-slate-400 py-6">Sin productos. Agrega uno con "+ Nuevo producto".</td></tr>'}</tbody>`;
+}
+
+/* ==================== MOVIMIENTOS (base) ==================== */
+function registrarMovimiento(m){
+  const mov = {
+    id: uid('mov'),
+    fecha: m.fecha || todayISO(),
+    tipo: m.tipo,
+    productoId: m.productoId,
+    codigo: m.codigo,
+    producto: m.producto,
+    cantidad: m.cantidad,
+    precioUnitario: m.precioUnitario||0,
+    total: (m.cantidad*(m.precioUnitario||0)),
+    motivo: m.motivo||'',
+    usuario: config.usuario || 'Sin especificar',
+    creado: new Date().toISOString()
+  };
+  movimientos.push(mov);
+  save(LS.movimientos, movimientos);
+  queueSync('nuevoMovimiento', {...mov});
+  return mov;
+}
+
+/* ==================== ENTRADAS ==================== */
+function renderEntradasView(){
+  const sel = document.getElementById('eProducto');
+  sel.innerHTML = productos.filter(p=>p.activo).sort((a,b)=>a.nombre.localeCompare(b.nombre))
+    .map(p=>`<option value="${p.id}">${p.nombre} (${p.codigo})</option>`).join('');
+  document.getElementById('eFecha').value = todayISO();
+  onEntradaProductoChange();
+  renderTablaEntradas();
+}
+function onEntradaProductoChange(){
+  const p = getProducto(document.getElementById('eProducto').value);
+  if(p) document.getElementById('eCosto').value = p.precioCompra;
+}
+function registrarEntrada(){
+  const pid = document.getElementById('eProducto').value;
+  const p = getProducto(pid);
+  const cant = parseInt(document.getElementById('eCantidad').value);
+  const costo = parseFloat(document.getElementById('eCosto').value)||0;
+  if(!p){ toast('Selecciona un producto', false); return; }
+  if(!cant || cant<=0){ toast('Cantidad inválida', false); return; }
+  p.stock += cant;
+  if(costo>0) p.precioCompra = costo;
+  save(LS.productos, productos);
+  queueSync('actualizarProducto', {...p});
+  registrarMovimiento({
+    tipo:'Entrada', productoId:p.id, codigo:p.codigo, producto:p.nombre,
+    cantidad:cant, precioUnitario:costo,
+    motivo: (document.getElementById('eProveedor').value?`Proveedor: ${document.getElementById('eProveedor').value}. `:'')+document.getElementById('eMotivo').value,
+    fecha: document.getElementById('eFecha').value
+  });
+  toast(`Entrada registrada: +${cant} ${p.unidad} de ${p.nombre}`);
+  document.getElementById('eCantidad').value = '';
+  document.getElementById('eMotivo').value = '';
+  renderTablaEntradas();
+  updatePendingBadge();
+}
+function renderTablaEntradas(){
+  const rows = movimientos.filter(m=>m.tipo==='Entrada').sort((a,b)=>b.creado.localeCompare(a.creado)).slice(0,15)
+    .map(m=>`<tr><td>${m.fecha}</td><td class="font-mono text-xs">${m.codigo}</td><td>${m.producto}</td><td>+${m.cantidad}</td><td>${money(m.precioUnitario)}</td><td>${money(m.total)}</td><td class="max-w-[220px] truncate">${m.motivo}</td></tr>`).join('');
+  document.getElementById('tblEntradas').innerHTML = `
+    <thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th>Cant.</th><th>Costo unit.</th><th>Total</th><th>Motivo</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="text-center text-slate-400 py-6">Sin entradas registradas</td></tr>'}</tbody>`;
+}
+
+/* ==================== SALIDAS / POS ==================== */
+function renderSalidasView(){
+  carrito = [];
+  document.getElementById('posBuscar').value = '';
+  document.getElementById('posCliente').value = '';
+  renderCarrito();
+  document.getElementById('posResultados').innerHTML = '';
+}
+function renderPosResultados(){
+  const q = document.getElementById('posBuscar').value.toLowerCase().trim();
+  const box = document.getElementById('posResultados');
+  if(!q){ box.innerHTML=''; return; }
+  const list = productos.filter(p=>p.activo && (p.nombre.toLowerCase().includes(q)||p.codigo.toLowerCase().includes(q))).slice(0,6);
+  if(!list.length){ box.innerHTML = `<div class="absolute bg-white border rounded-lg shadow-lg mt-1 w-full p-3 text-sm text-slate-400 z-20">Sin resultados</div>`; return; }
+  box.innerHTML = `<div class="absolute bg-white border rounded-lg shadow-lg mt-1 w-full z-20 max-h-52 overflow-y-auto">${list.map(p=>`
+    <div class="px-3 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center text-sm" onclick="seleccionarPosProducto('${p.id}')">
+      <span>${p.nombre} <span class="text-slate-400 text-xs">(${p.codigo})</span></span>
+      <span class="text-xs ${p.stock<=0?'text-red-600':'text-slate-500'}">${p.stock} en stock</span>
+    </div>`).join('')}</div>`;
+}
+let posSeleccionado = null;
+function seleccionarPosProducto(id){
+  posSeleccionado = id;
+  const p = getProducto(id);
+  document.getElementById('posBuscar').value = `${p.nombre} (${p.codigo})`;
+  document.getElementById('posResultados').innerHTML = '';
+}
+function agregarAlCarrito(){
+  let p = posSeleccionado ? getProducto(posSeleccionado) : null;
+  if(!p){
+    const q = document.getElementById('posBuscar').value.toLowerCase().trim();
+    p = productos.find(x=>x.activo && (x.codigo.toLowerCase()===q));
+  }
+  if(!p){ toast('Selecciona un producto de la lista', false); return; }
+  const cant = parseInt(document.getElementById('posCantidad').value)||1;
+  const existente = carrito.find(c=>c.productoId===p.id);
+  if(existente) existente.cantidad += cant;
+  else carrito.push({productoId:p.id, codigo:p.codigo, nombre:p.nombre, cantidad:cant, precioUnitario:p.precioVenta, stockDisponible:p.stock, unidad:p.unidad});
+  posSeleccionado = null;
+  document.getElementById('posBuscar').value = '';
+  document.getElementById('posCantidad').value = 1;
+  renderCarrito();
+}
+function quitarDelCarrito(pid){ carrito = carrito.filter(c=>c.productoId!==pid); renderCarrito(); }
+function actualizarCantidadCarrito(pid, val){
+  const item = carrito.find(c=>c.productoId===pid);
+  item.cantidad = Math.max(1, parseInt(val)||1);
+  renderCarrito();
+}
+function actualizarPrecioCarrito(pid, val){
+  const item = carrito.find(c=>c.productoId===pid);
+  item.precioUnitario = parseFloat(val)||0;
+  renderCarrito();
+}
+function renderCarrito(){
+  const rows = carrito.map(c=>{
+    const excede = c.cantidad > c.stockDisponible;
+    return `<tr class="${excede?'bg-red-50':''}">
+      <td>${c.nombre}<div class="text-[10px] text-slate-400">${c.codigo} · stock: ${c.stockDisponible}</div></td>
+      <td><input type="number" min="1" value="${c.cantidad}" class="w-16" onchange="actualizarCantidadCarrito('${c.productoId}', this.value)"></td>
+      <td><input type="number" min="0" step="0.01" value="${c.precioUnitario}" class="w-24" onchange="actualizarPrecioCarrito('${c.productoId}', this.value)"></td>
+      <td class="font-semibold">${money(c.cantidad*c.precioUnitario)}</td>
+      <td class="no-print"><button class="text-red-600 text-xs" onclick="quitarDelCarrito('${c.productoId}')">✕</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tblCarrito').innerHTML = `
+    <thead><tr><th>Producto</th><th>Cant.</th><th>P. unit.</th><th>Subtotal</th><th class="no-print"></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="text-center text-slate-400 py-6">Carrito vacío. Busca un producto arriba.</td></tr>'}</tbody>`;
+  const total = carrito.reduce((s,c)=>s+c.cantidad*c.precioUnitario,0);
+  document.getElementById('posCount').textContent = carrito.reduce((s,c)=>s+c.cantidad,0);
+  document.getElementById('posTotal').textContent = money(total);
+}
+function limpiarCarrito(){ carrito = []; renderCarrito(); }
+function confirmarSalida(){
+  if(!carrito.length){ toast('El carrito está vacío', false); return; }
+  const excedidos = carrito.filter(c=>c.cantidad > c.stockDisponible);
+  if(excedidos.length && !config.permitirNegativo){
+    if(!confirm(`Algunos productos no tienen stock suficiente (${excedidos.map(e=>e.nombre).join(', ')}). ¿Continuar de todas formas? El stock quedará en negativo.`)) return;
+  }
+  const tipo = document.getElementById('posTipo').value;
+  const cliente = document.getElementById('posCliente').value;
+  carrito.forEach(c=>{
+    const p = getProducto(c.productoId);
+    p.stock -= c.cantidad;
+    registrarMovimiento({
+      tipo:'Salida', productoId:p.id, codigo:p.codigo, producto:p.nombre,
+      cantidad:c.cantidad, precioUnitario:c.precioUnitario,
+      motivo: `${tipo}${cliente?(' · '+cliente):''}`
+    });
+  });
+  save(LS.productos, productos);
+  carrito.forEach(c=>queueSync('actualizarProducto', {...getProducto(c.productoId)}));
+  toast('Salida registrada correctamente');
+  limpiarCarrito();
+  updatePendingBadge();
+}
+
+/* ==================== MOVIMIENTOS (vista) ==================== */
+function getMovimientosFiltrados(){
+  const desde = document.getElementById('fMovDesde')?.value;
+  const hasta = document.getElementById('fMovHasta')?.value;
+  const tipo = document.getElementById('fMovTipo')?.value;
+  const q = (document.getElementById('fMovBuscar')?.value||'').toLowerCase();
+  return movimientos.filter(m=>{
+    if(desde && m.fecha < desde) return false;
+    if(hasta && m.fecha > hasta) return false;
+    if(tipo && m.tipo!==tipo) return false;
+    if(q && !(m.producto.toLowerCase().includes(q)||m.codigo.toLowerCase().includes(q))) return false;
+    return true;
+  }).sort((a,b)=>b.creado.localeCompare(a.creado));
+}
+function renderMovimientos(){
+  const list = getMovimientosFiltrados();
+  const rows = list.map(m=>`<tr>
+    <td>${m.fecha}</td>
+    <td><span class="badge ${m.tipo==='Entrada'?'badge-ok':'badge-warn'}">${m.tipo}</span></td>
+    <td class="font-mono text-xs">${m.codigo}</td>
+    <td>${m.producto}</td>
+    <td>${m.tipo==='Entrada'?'+':'-'}${m.cantidad}</td>
+    <td>${money(m.precioUnitario)}</td>
+    <td>${money(m.total)}</td>
+    <td class="max-w-[200px] truncate">${m.motivo}</td>
+    <td>${m.usuario}</td>
+  </tr>`).join('');
+  document.getElementById('tblMovimientos').innerHTML = `
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Código</th><th>Producto</th><th>Cant.</th><th>P.Unit</th><th>Total</th><th>Motivo</th><th>Usuario</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin movimientos</td></tr>'}</tbody>`;
+}
+
+/* ==================== DASHBOARD ==================== */
+let chartTop, chartFlow;
+function renderDashboard(){
+  const activos = productos.filter(p=>p.activo);
+  const valorCompra = activos.reduce((s,p)=>s+p.stock*p.precioCompra,0);
+  const valorVenta = activos.reduce((s,p)=>s+p.stock*p.precioVenta,0);
+  const stockBajo = activos.filter(p=>p.stock<=p.stockMinimo);
+  const hoy = todayISO();
+  const movHoy = movimientos.filter(m=>m.fecha===hoy);
+  const ventasHoy = movHoy.filter(m=>m.tipo==='Salida' && m.motivo.startsWith('Venta')).reduce((s,m)=>s+m.total,0);
+
+  const kpis = [
+    {label:'Productos activos', val: activos.length, color:'text-navy'},
+    {label:'Valor inventario (costo)', val: money(valorCompra), color:'text-navy'},
+    {label:'Valor inventario (venta)', val: money(valorVenta), color:'text-navy'},
+    {label:'Stock bajo', val: stockBajo.length, color: stockBajo.length? 'text-red-600':'text-navy'},
+    {label:'Movimientos hoy', val: movHoy.length, color:'text-navy'},
+    {label:'Ventas de hoy', val: money(ventasHoy), color:'text-navy'}
+  ];
+  document.getElementById('kpiCards').innerHTML = kpis.map(k=>`
+    <div class="kpi-card p-3">
+      <p class="text-[11px] text-slate-500 font-semibold leading-tight">${k.label}</p>
+      <p class="text-lg font-black ${k.color} mt-1">${k.val}</p>
+    </div>`).join('');
+
+  // Alertas
+  const rowsAlertas = stockBajo.sort((a,b)=>a.stock-b.stock).slice(0,6).map(p=>`
+    <tr><td class="font-mono text-xs">${p.codigo}</td><td>${p.nombre}</td><td><span class="badge ${p.stock<=0?'badge-danger':'badge-warn'}">${p.stock} ${p.unidad}</span></td><td>${p.stockMinimo}</td></tr>`).join('');
+  document.getElementById('tblAlertas').innerHTML = `
+    <thead><tr><th>Código</th><th>Producto</th><th>Stock actual</th><th>Mínimo</th></tr></thead>
+    <tbody>${rowsAlertas || '<tr><td colspan="4" class="text-center text-slate-400 py-6">Sin alertas de stock bajo 🎉</td></tr>'}</tbody>`;
+
+  // Chart top vendidos 30 dias
+  const desde30 = new Date(); desde30.setDate(desde30.getDate()-30);
+  const desde30ISO = desde30.toISOString().slice(0,10);
+  const ventas30 = movimientos.filter(m=>m.tipo==='Salida' && m.fecha>=desde30ISO);
+  const porProducto = {};
+  ventas30.forEach(m=>{ porProducto[m.producto] = (porProducto[m.producto]||0) + m.cantidad; });
+  const topArr = Object.entries(porProducto).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(chartTop) chartTop.destroy();
+  chartTop = new Chart(document.getElementById('chartTop'), {
+    type:'bar',
+    data:{ labels: topArr.map(a=>a[0]), datasets:[{label:'Unidades vendidas', data: topArr.map(a=>a[1]), backgroundColor:'#facc15', borderRadius:6}] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+  });
+
+  // Chart flujo 7 dias
+  const dias = [];
+  for(let i=6;i>=0;i--){ const d = new Date(); d.setDate(d.getDate()-i); dias.push(d.toISOString().slice(0,10)); }
+  const entradasPorDia = dias.map(d=>movimientos.filter(m=>m.tipo==='Entrada'&&m.fecha===d).reduce((s,m)=>s+m.cantidad,0));
+  const salidasPorDia = dias.map(d=>movimientos.filter(m=>m.tipo==='Salida'&&m.fecha===d).reduce((s,m)=>s+m.cantidad,0));
+  if(chartFlow) chartFlow.destroy();
+  chartFlow = new Chart(document.getElementById('chartFlow'), {
+    type:'line',
+    data:{ labels: dias.map(d=>d.slice(5)), datasets:[
+      {label:'Entradas', data: entradasPorDia, borderColor:'#001529', backgroundColor:'#001529', tension:.3},
+      {label:'Salidas', data: salidasPorDia, borderColor:'#facc15', backgroundColor:'#eab308', tension:.3}
+    ]},
+    options:{ responsive:true, scales:{y:{beginAtZero:true}} }
+  });
+}
+
+/* ==================== REPORTES ==================== */
+function showReporte(rep){
+  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.toggle('active', t.dataset.rep===rep));
+  document.querySelectorAll('.rep-panel').forEach(p=>p.classList.add('hidden'));
+  document.getElementById('rep-'+rep).classList.remove('hidden');
+  if(rep==='valuacion') renderReporteValuacion();
+  if(rep==='stockbajo') renderReporteStockBajo();
+  if(rep==='rotacion') renderReporteRotacion();
+  if(rep==='ventas') renderReporteVentas();
+}
+function renderReporteValuacion(){
+  const activos = productos.filter(p=>p.activo);
+  const valorCompra = activos.reduce((s,p)=>s+p.stock*p.precioCompra,0);
+  const valorVenta = activos.reduce((s,p)=>s+p.stock*p.precioVenta,0);
+  document.getElementById('repValKpis').innerHTML = `
+    <div class="card"><p class="text-xs text-slate-500 font-semibold">Valor total a costo</p><p class="text-xl font-black text-navy">${money(valorCompra)}</p></div>
+    <div class="card"><p class="text-xs text-slate-500 font-semibold">Valor total a venta</p><p class="text-xl font-black text-navy">${money(valorVenta)}</p></div>
+    <div class="card"><p class="text-xs text-slate-500 font-semibold">Utilidad potencial</p><p class="text-xl font-black text-navy">${money(valorVenta-valorCompra)}</p></div>`;
+  const rows = activos.sort((a,b)=>(b.stock*b.precioCompra)-(a.stock*a.precioCompra)).map(p=>`
+    <tr><td class="font-mono text-xs">${p.codigo}</td><td>${p.nombre}</td><td>${p.categoria}</td><td>${p.stock} ${p.unidad}</td><td>${money(p.precioCompra)}</td><td>${money(p.stock*p.precioCompra)}</td><td>${money(p.stock*p.precioVenta)}</td></tr>`).join('');
+  document.getElementById('tblValuacion').innerHTML = `
+    <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Stock</th><th>Costo unit.</th><th>Valor costo</th><th>Valor venta</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="7" class="text-center text-slate-400 py-6">Sin datos</td></tr>'}</tbody>`;
+}
+function renderReporteStockBajo(){
+  const list = productos.filter(p=>p.activo && p.stock<=p.stockMinimo).sort((a,b)=>a.stock-b.stock);
+  const rows = list.map(p=>`<tr><td class="font-mono text-xs">${p.codigo}</td><td>${p.nombre}</td><td>${p.stock}</td><td>${p.stockMinimo}</td><td>${Math.max(p.stockMinimo*2-p.stock,p.stockMinimo)}</td></tr>`).join('');
+  document.getElementById('tblStockBajoRep').innerHTML = `
+    <thead><tr><th>Código</th><th>Producto</th><th>Stock actual</th><th>Mínimo</th><th>Compra sugerida</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="text-center text-slate-400 py-6">No hay productos bajo el mínimo 🎉</td></tr>'}</tbody>`;
+}
+let chartRotacion;
+function renderReporteRotacion(){
+  const ventas = movimientos.filter(m=>m.tipo==='Salida');
+  const porProd = {};
+  ventas.forEach(m=>{
+    if(!porProd[m.codigo]) porProd[m.codigo] = {producto:m.producto, cantidad:0, total:0};
+    porProd[m.codigo].cantidad += m.cantidad;
+    porProd[m.codigo].total += m.total;
+  });
+  const arr = Object.entries(porProd).map(([codigo,v])=>({codigo,...v})).sort((a,b)=>b.cantidad-a.cantidad);
+  const top10 = arr.slice(0,10);
+  if(chartRotacion) chartRotacion.destroy();
+  chartRotacion = new Chart(document.getElementById('chartRotacion'), {
+    type:'bar',
+    data:{ labels: top10.map(a=>a.producto), datasets:[{label:'Unidades vendidas (histórico)', data: top10.map(a=>a.cantidad), backgroundColor:'#001529', borderRadius:6}]},
+    options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false}} }
+  });
+  const rows = arr.map((a,i)=>`<tr><td>${i+1}</td><td>${a.codigo}</td><td>${a.producto}</td><td>${a.cantidad}</td><td>${money(a.total)}</td></tr>`).join('');
+  document.getElementById('tblRotacion').innerHTML = `
+    <thead><tr><th>#</th><th>Código</th><th>Producto</th><th>Unid. vendidas</th><th>Total vendido</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin ventas registradas aún</td></tr>'}</tbody>`;
+}
+let chartVentasPeriodo;
+function periodKey(fecha, modo){
+  const d = new Date(fecha+'T00:00:00');
+  if(modo==='dia') return fecha;
+  if(modo==='mes') return fecha.slice(0,7);
+  const onejan = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
+  return `${d.getFullYear()}-S${week}`;
+}
+function renderReporteVentas(){
+  const modo = document.getElementById('ventasAgrupacion').value;
+  const ventas = movimientos.filter(m=>m.tipo==='Salida' && m.motivo.startsWith('Venta'));
+  const agrupado = {};
+  ventas.forEach(m=>{
+    const k = periodKey(m.fecha, modo);
+    agrupado[k] = (agrupado[k]||0) + m.total;
+  });
+  const keys = Object.keys(agrupado).sort();
+  if(chartVentasPeriodo) chartVentasPeriodo.destroy();
+  chartVentasPeriodo = new Chart(document.getElementById('chartVentasPeriodo'), {
+    type:'bar',
+    data:{ labels: keys, datasets:[{label:'Ventas', data: keys.map(k=>agrupado[k]), backgroundColor:'#facc15', borderRadius:6}] },
+    options:{ responsive:true, plugins:{legend:{display:false}} }
+  });
+  const rows = keys.map(k=>`<tr><td>${k}</td><td>${money(agrupado[k])}</td></tr>`).join('');
+  document.getElementById('tblVentasPeriodo').innerHTML = `
+    <thead><tr><th>Periodo</th><th>Total vendido</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="2" class="text-center text-slate-400 py-6">Sin ventas registradas</td></tr>'}</tbody>`;
+}
+
+/* ==================== RECOMENDACIONES DE SURTIDO ==================== */
+function renderRecomendaciones(){
+  const ventana = parseInt(document.getElementById('recVentana').value)||30;
+  const entrega = parseInt(document.getElementById('recEntrega').value)||7;
+  const colchon = parseInt(document.getElementById('recColchon').value)||5;
+  const desde = new Date(); desde.setDate(desde.getDate()-ventana);
+  const desdeISO = desde.toISOString().slice(0,10);
+
+  const activos = productos.filter(p=>p.activo);
+  const calc = activos.map(p=>{
+    const salidas = movimientos.filter(m=>m.tipo==='Salida' && m.productoId===p.id && m.fecha>=desdeISO);
+    const totalSalidas = salidas.reduce((s,m)=>s+m.cantidad,0);
+    const consumoDiario = totalSalidas / ventana;
+    const diasCobertura = consumoDiario>0 ? (p.stock/consumoDiario) : (p.stock>0 ? Infinity : 0);
+    const puntoReorden = consumoDiario*(entrega+colchon) + p.stockMinimo;
+    let sugerido = 0;
+    if(p.stock <= puntoReorden){
+      sugerido = Math.ceil(Math.max(puntoReorden - p.stock, p.stockMinimo - p.stock, 0));
+    }
+    return {...p, consumoDiario, diasCobertura, puntoReorden, sugerido};
+  }).filter(c=>c.sugerido>0 || c.stock<=c.stockMinimo)
+    .sort((a,b)=> a.diasCobertura - b.diasCobertura);
+
+  window._ultimaRecomendacion = calc;
+
+  const rows = calc.map(c=>{
+    const urgencia = c.diasCobertura<=colchon ? 'badge-danger' : (c.diasCobertura<=entrega+colchon ? 'badge-warn' : 'badge-ok');
+    const cobTxt = c.diasCobertura===Infinity ? 'Sin consumo' : c.diasCobertura.toFixed(1)+' días';
+    return `<tr>
+      <td class="font-mono text-xs">${c.codigo}</td><td>${c.nombre}</td><td>${c.categoria}</td>
+      <td>${c.stock} ${c.unidad}</td><td>${c.consumoDiario.toFixed(2)}/día</td>
+      <td><span class="badge ${urgencia}">${cobTxt}</span></td>
+      <td class="font-bold">${c.sugerido} ${c.unidad}</td>
+      <td>${c.proveedor||'-'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tblRecomendaciones').innerHTML = `
+    <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Stock</th><th>Consumo</th><th>Cobertura</th><th>Sugerido comprar</th><th>Proveedor</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="8" class="text-center text-slate-400 py-6">Ningún producto requiere reabastecimiento por ahora 🎉</td></tr>'}</tbody>`;
+  document.getElementById('ordenCompraArea').innerHTML = '';
+}
+function generarOrdenCompra(){
+  const data = window._ultimaRecomendacion || [];
+  if(!data.length){ toast('No hay productos sugeridos para orden de compra', false); return; }
+  const porProveedor = {};
+  data.forEach(c=>{
+    const prov = c.proveedor || 'Sin proveedor asignado';
+    if(!porProveedor[prov]) porProveedor[prov] = [];
+    porProveedor[prov].push(c);
+  });
+  let html = `<div class="card print-area"><div class="flex justify-between items-center mb-3 no-print"><p class="font-bold text-navy">Orden de compra sugerida — ${new Date().toLocaleDateString('es-MX')}</p><button class="btn btn-outline" onclick="window.print()">Imprimir</button></div>`;
+  Object.entries(porProveedor).forEach(([prov, items])=>{
+    html += `<p class="font-bold text-navy mt-3 mb-1">${prov}</p><table class="mb-3">
+      <thead><tr><th>Código</th><th>Producto</th><th>Cant. sugerida</th><th>Costo estimado</th></tr></thead>
+      <tbody>${items.map(i=>`<tr><td class="font-mono text-xs">${i.codigo}</td><td>${i.nombre}</td><td>${i.sugerido} ${i.unidad}</td><td>${money(i.sugerido*i.precioCompra)}</td></tr>`).join('')}</tbody>
+    </table>`;
+  });
+  const totalEstimado = data.reduce((s,i)=>s+i.sugerido*i.precioCompra,0);
+  html += `<p class="text-right font-black text-navy">Total estimado: ${money(totalEstimado)}</p></div>`;
+  document.getElementById('ordenCompraArea').innerHTML = html;
+}
+
+/* ==================== CONFIGURACION ==================== */
+function renderConfigView(){
+  document.getElementById('cfgUsuario').value = config.usuario||'';
+  document.getElementById('cfgAppsScriptUrl').value = config.appsScriptUrl||'';
+  updatePendingBadge();
+}
+function guardarConfigGeneral(){
+  config.usuario = document.getElementById('cfgUsuario').value.trim();
+  save(LS.config, config);
+  toast('Configuración guardada');
+}
+function guardarAppsScriptUrl(){
+  config.appsScriptUrl = document.getElementById('cfgAppsScriptUrl').value.trim();
+  save(LS.config, config);
+  toast('URL guardada');
+}
+function importarProductosCSV(){
+  const url = document.getElementById('cfgCsvUrl').value.trim();
+  if(!url){ toast('Pega la URL del CSV publicado', false); return; }
+  Papa.parse(url, {
+    download:true, header:true, skipEmptyLines:true,
+    complete: (res)=>{
+      let n=0;
+      res.data.forEach(row=>{
+        const codigo = (row.Codigo||row['Código']||'').trim();
+        const nombre = (row.Nombre||'').trim();
+        if(!codigo || !nombre) return;
+        if(productos.some(p=>p.codigo.toLowerCase()===codigo.toLowerCase())) return;
+        productos.push({
+          id: uid('prod'), codigo, nombre,
+          categoria: (row.Categoria||row['Categoría']||'Sin categoría').trim(),
+          unidad: (row.Unidad||'pieza').trim(),
+          proveedor: (row.Proveedor||'').trim(),
+          precioCompra: parseFloat(row.PrecioCompra)||0,
+          precioVenta: parseFloat(row.PrecioVenta)||0,
+          stockMinimo: parseInt(row.StockMinimo)||5,
+          stock: parseInt(row.StockInicial)||0,
+          activo:true
+        });
+        n++;
+      });
+      save(LS.productos, productos);
+      toast(`${n} productos importados`);
+      renderProductos();
+    },
+    error: ()=> toast('No se pudo leer el CSV. Verifica que esté publicado.', false)
+  });
+}
+function exportarRespaldo(){
+  const data = {productos, movimientos, config, exportado: new Date().toISOString()};
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `modelorama_respaldo_${todayISO()}.json`;
+  a.click();
+}
+function importarRespaldo(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!confirm('Esto reemplazará todos los datos actuales. ¿Continuar?')) return;
+      productos = data.productos||[];
+      movimientos = data.movimientos||[];
+      config = data.config||config;
+      save(LS.productos, productos); save(LS.movimientos, movimientos); save(LS.config, config);
+      toast('Respaldo importado correctamente');
+      renderConfigView();
+    }catch(err){ toast('Archivo inválido', false); }
+  };
+  reader.readAsText(file);
+}
+function cargarDatosEjemplo(){
+  if(productos.length && !confirm('Ya tienes productos cargados. ¿Agregar datos de ejemplo de todas formas?')) return;
+  const ejemplo = [
+    {codigo:'CER-001', nombre:'Corona Extra 355ml (six)', categoria:'Cerveza', unidad:'six', proveedor:'Grupo Modelo', precioCompra:95, precioVenta:120, stockMinimo:10, stock:35},
+    {codigo:'CER-002', nombre:'Modelo Especial 355ml (six)', categoria:'Cerveza', unidad:'six', proveedor:'Grupo Modelo', precioCompra:98, precioVenta:125, stockMinimo:10, stock:8},
+    {codigo:'REF-001', nombre:'Coca-Cola 600ml', categoria:'Refresco', unidad:'pieza', proveedor:'FEMSA', precioCompra:12, precioVenta:20, stockMinimo:24, stock:60},
+    {codigo:'BOT-001', nombre:'Agua natural 1L', categoria:'Agua', unidad:'pieza', proveedor:'Bonafont', precioCompra:8, precioVenta:15, stockMinimo:20, stock:12},
+    {codigo:'BOT-002', nombre:'Hielo bolsa 4kg', categoria:'Hielo', unidad:'bolsa', proveedor:'Local', precioCompra:15, precioVenta:30, stockMinimo:15, stock:5},
+    {codigo:'SNK-001', nombre:'Botana Sabritas 45g', categoria:'Botana', unidad:'pieza', proveedor:'PepsiCo', precioCompra:10, precioVenta:18, stockMinimo:15, stock:22}
+  ];
+  ejemplo.forEach(e=>{ if(!productos.some(p=>p.codigo===e.codigo)) productos.push({id:uid('prod'), activo:true, ...e}); });
+  save(LS.productos, productos);
+  // movimientos de ejemplo (ultimos 15 dias)
+  for(let i=14;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const fecha = d.toISOString().slice(0,10);
+    productos.forEach(p=>{
+      if(Math.random()<0.5){
+        const cant = Math.ceil(Math.random()*3);
+        registrarMovimiento({tipo:'Salida', productoId:p.id, codigo:p.codigo, producto:p.nombre, cantidad:cant, precioUnitario:p.precioVenta, motivo:'Venta', fecha});
+      }
+    });
+  }
+  toast('Datos de ejemplo cargados');
+  renderConfigView();
+  showView('dashboard');
+}
+function borrarTodo(){
+  if(!confirm('Esto eliminará TODOS los productos y movimientos guardados localmente. ¿Estás segura/o?')) return;
+  if(!confirm('Última confirmación: esta acción no se puede deshacer. ¿Borrar todo?')) return;
+  productos = []; movimientos = []; pending = [];
+  save(LS.productos, productos); save(LS.movimientos, movimientos); save(LS.pending, pending);
+  toast('Todos los datos fueron borrados');
+  showView('dashboard');
+}
+
+/* ==================== UTIL: EXPORT CSV ==================== */
+function exportCSV(rows, filename){
+  if(!rows || !rows.length){ toast('Nada que exportar', false); return; }
+  const cols = Object.keys(rows[0]);
+  const csv = [cols.join(',')].concat(rows.map(r=>cols.map(c=>`"${String(r[c]??'').replace(/"/g,'""')}"`).join(','))).join('\n');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+/* ==================== INIT ==================== */
+updatePendingBadge();
+renderDashboard();
+</script>
+</body>
+</html>

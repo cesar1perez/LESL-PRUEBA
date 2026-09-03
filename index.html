@@ -465,13 +465,32 @@ function categorias(){
 }
 function getProducto(id){ return productos.find(p=>p.id===id); }
 
+function generarCodigoConsecutivo(){
+  let max = 0;
+  productos.forEach(p=>{
+    const m = /^PROD-(\d+)$/i.exec((p.codigo||'').trim());
+    if(m) max = Math.max(max, parseInt(m[1]));
+  });
+  return 'PROD-' + String(max+1).padStart(4,'0');
+}
+function regenerarCodigo(){
+  document.getElementById('mCodigo').value = generarCodigoConsecutivo();
+}
 function openProductoModal(id){
   const p = id ? getProducto(id) : null;
+  const codigoSugerido = p ? p.codigo : generarCodigoConsecutivo();
   openModal(`
     <div class="p-5">
       <h3 class="font-black text-navy text-lg mb-4">${p?'Editar producto':'Nuevo producto'}</h3>
       <div class="grid grid-cols-2 gap-3">
-        <div><label>Código</label><input type="text" id="mCodigo" value="${p?p.codigo:''}" ${p?'readonly':''}></div>
+        <div>
+          <label>Código</label>
+          <div class="flex gap-1">
+            <input type="text" id="mCodigo" value="${codigoSugerido}" ${p?'':'autocomplete="off"'}>
+            ${p?'':`<button type="button" class="btn btn-outline !px-2 !py-1 text-xs" title="Generar otro código consecutivo" onclick="regenerarCodigo()">🔄</button>`}
+          </div>
+          ${p?'':'<p class="text-[10px] text-slate-400 mt-1">Código automático, puedes borrarlo y escribir el tuyo.</p>'}
+        </div>
         <div><label>Categoría</label><input type="text" list="dlCategorias" id="mCategoria" value="${p?p.categoria:''}" placeholder="Ej. Cerveza, Refresco...">
           <datalist id="dlCategorias">${categorias().map(c=>`<option value="${c}">`).join('')}</datalist>
         </div>

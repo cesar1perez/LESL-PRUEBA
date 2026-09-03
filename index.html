@@ -177,6 +177,11 @@
     <section id="view-entradas" class="section">
       <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Entradas de existencias</h1>
       <p class="text-sm text-slate-500 mb-4">Registra compras, reabastecimientos o ajustes positivos</p>
+      <div id="eAvisoSinProductos" class="hidden mb-4 rounded-lg border-l-4 border-yellow bg-yellow-50 px-4 py-3">
+        <p class="text-sm font-bold text-navy">Todavía no hay productos en el catálogo</p>
+        <p class="text-xs text-slate-600 mt-1">Para registrar una entrada primero necesitas dar de alta el producto. Puedes hacerlo aquí mismo:</p>
+        <button class="btn btn-yellow mt-2" onclick="openProductoModal(null,'entradas')">+ Crear producto ahora</button>
+      </div>
       <div class="card mb-4">
         <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
           <div class="md:col-span-2"><label>Producto</label><select id="eProducto" onchange="onEntradaProductoChange()"></select></div>
@@ -476,7 +481,8 @@ function generarCodigoConsecutivo(){
 function regenerarCodigo(){
   document.getElementById('mCodigo').value = generarCodigoConsecutivo();
 }
-function openProductoModal(id){
+function openProductoModal(id, origen){
+  window._origenModalProducto = origen || 'productos';
   const p = id ? getProducto(id) : null;
   const codigoSugerido = p ? p.codigo : generarCodigoConsecutivo();
   openModal(`
@@ -508,7 +514,7 @@ function openProductoModal(id){
       </div>
       <div class="flex gap-2 mt-5">
         <button class="btn btn-primary flex-1" onclick="guardarProducto(${p?`'${p.id}'`:'null'})">Guardar</button>
-        <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-outline" onclick="cancelarProductoModal()">Cancelar</button>
         ${p?`<button class="btn btn-danger" onclick="eliminarProducto('${p.id}')">Eliminar</button>`:''}
       </div>
     </div>
@@ -542,7 +548,21 @@ function guardarProducto(id){
   }
   save(LS.productos, productos);
   closeModal();
-  renderProductos();
+  if(window._origenModalProducto === 'entradas'){
+    renderEntradasView();
+    const sel = document.getElementById('eProducto');
+    const nuevo = productos[productos.length-1];
+    if(!id && nuevo) sel.value = nuevo.id;
+    onEntradaProductoChange();
+  }else{
+    renderProductos();
+  }
+  window._origenModalProducto = 'productos';
+}
+function cancelarProductoModal(){
+  closeModal();
+  if(window._origenModalProducto === 'entradas'){ renderEntradasView(); }
+  window._origenModalProducto = 'productos';
 }
 function eliminarProducto(id){
   const p = getProducto(id);
@@ -627,14 +647,23 @@ function registrarMovimiento(m){
 /* ==================== ENTRADAS ==================== */
 function renderEntradasView(){
   const sel = document.getElementById('eProducto');
-  sel.innerHTML = productos.filter(p=>p.activo).sort((a,b)=>a.nombre.localeCompare(b.nombre))
-    .map(p=>`<option value="${p.id}">${p.nombre} (${p.codigo})</option>`).join('');
+  const activos = productos.filter(p=>p.activo).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  sel.innerHTML =
+    (activos.length ? '' : '<option value="">— Aún no hay productos —</option>') +
+    activos.map(p=>`<option value="${p.id}">${p.nombre} (${p.codigo})</option>`).join('') +
+    '<option value="__nuevo__">➕ Crear producto nuevo...</option>';
+  document.getElementById('eAvisoSinProductos').classList.toggle('hidden', activos.length>0);
   document.getElementById('eFecha').value = todayISO();
   onEntradaProductoChange();
   renderTablaEntradas();
 }
 function onEntradaProductoChange(){
-  const p = getProducto(document.getElementById('eProducto').value);
+  const val = document.getElementById('eProducto').value;
+  if(val === '__nuevo__'){
+    openProductoModal(null, 'entradas');
+    return;
+  }
+  const p = getProducto(val);
   if(p) document.getElementById('eCosto').value = p.precioCompra;
 }
 function registrarEntrada(){

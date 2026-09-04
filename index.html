@@ -6,6 +6,7 @@
 <title>Modelorama - Prueba | Control de Inventarios</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{ --navy:#001529; --navy-light:#0a2540; --yellow:#facc15; --yellow-dark:#eab308; }
   *{font-family: Arial, Helvetica, sans-serif;}
@@ -113,6 +114,7 @@
       <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="proveedores"><span>🚚</span><span>Proveedores</span></div>
       <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="entradas"><span>⬇️</span><span>Entradas</span></div>
       <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="salidas"><span>🧾</span><span>Salidas / Venta</span></div>
+      <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="notas"><span>🧾</span><span>Notas de venta</span></div>
       <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="conteo"><span>🔢</span><span>Conteo físico</span></div>
       <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="movimientos"><span>🔄</span><span>Movimientos</span></div>
       <div class="nav-item flex items-center gap-3 text-white/90 px-3 py-2.5 rounded-lg cursor-pointer" data-view="reportes"><span>📈</span><span>Reportes</span></div>
@@ -261,6 +263,20 @@
       </div>
     </section>
 
+    <!-- NOTAS DE VENTA -->
+    <section id="view-notas" class="section">
+      <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Notas de venta</h1>
+      <p class="text-sm text-slate-500 mb-4">Historial de ventas. Puedes volver a generar la nota de cualquiera cuando quieras.</p>
+      <div class="card mb-4 no-print">
+        <div class="flex flex-wrap gap-3 items-end">
+          <div><label>Desde</label><input type="date" id="fNotaDesde" onchange="renderNotas()"></div>
+          <div><label>Hasta</label><input type="date" id="fNotaHasta" onchange="renderNotas()"></div>
+          <div class="flex-1 min-w-[160px]"><label>Buscar</label><input type="text" id="fNotaBuscar" placeholder="Folio o cliente" oninput="renderNotas()"></div>
+        </div>
+      </div>
+      <div class="card overflow-x-auto"><table id="tblNotas"></table></div>
+    </section>
+
     <!-- CONTEO FÍSICO -->
     <section id="view-conteo" class="section">
       <h1 class="text-xl lg:text-2xl font-black text-navy mb-1">Conteo físico</h1>
@@ -404,6 +420,19 @@
         <p id="cfgEstadoConexion" class="text-xs mt-3"></p>
       </div>
       <div class="card mb-4">
+        <p class="font-bold text-navy mb-2 text-sm">Datos para la nota de venta</p>
+        <p class="text-xs text-slate-500 mb-3">Esto aparece en el encabezado del PDF que se le entrega al cliente.</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div><label>Nombre del negocio</label><input type="text" id="cfgNegNombre" placeholder="Modelorama - Prueba"></div>
+          <div><label>Teléfono</label><input type="text" id="cfgNegTelefono" placeholder="775 123 4567"></div>
+          <div class="md:col-span-2"><label>Dirección</label><input type="text" id="cfgNegDireccion" placeholder="Calle, número, colonia, ciudad"></div>
+          <div class="md:col-span-2"><label>Mensaje al pie</label><input type="text" id="cfgNegMensaje" placeholder="¡Gracias por su compra!"></div>
+        </div>
+        <button class="btn btn-primary mt-3" id="btnGuardarNegocio" onclick="guardarNegocio()">Guardar datos</button>
+        <p class="text-[11px] text-slate-400 mt-2">La nota no es un comprobante fiscal: no desglosa IVA ni sustituye a una factura.</p>
+      </div>
+
+      <div class="card mb-4">
         <p class="font-bold text-navy mb-2 text-sm">Respaldo adicional</p>
         <p class="text-xs text-slate-500 mb-2">La información ya vive en el Google Sheet. Esto es una copia extra.</p>
         <button class="btn btn-outline" onclick="exportarRespaldo()">Descargar respaldo (.json)</button>
@@ -437,6 +466,8 @@ const LS = { cache:'modelorama_cache', cola:'modelorama_cola', usuario:'modelora
 
 let apiUrl = leerLS(LS.apiUrl, API_URL_DEFAULT);
 let productos = [], movimientos = [], proveedores = [], catalogos = [], bitacora = [];
+let negocio = {negocioNombre:'Modelorama - Prueba', negocioDireccion:'', negocioTelefono:'', negocioMensaje:''};
+let ultimaVenta = null;
 let cola = leerLS(LS.cola, []);
 let usuario = leerLS(LS.usuario, '');
 let enLinea = false, ultimaSync = null, carrito = [], posSeleccionado = null, vistaActual = 'dashboard';
@@ -480,8 +511,9 @@ async function iniciar(){
     if(!r || !r.ok) throw new Error(r && r.error ? r.error : 'Respuesta inválida del servidor');
     productos = r.productos||[]; movimientos = r.movimientos||[];
     proveedores = r.proveedores||[]; catalogos = r.catalogos||[];
+    if(r.negocio) negocio = r.negocio;
     ultimaSync = new Date();
-    guardarLS(LS.cache, {productos, movimientos, proveedores, catalogos, fecha: ultimaSync.toISOString()});
+    guardarLS(LS.cache, {productos, movimientos, proveedores, catalogos, negocio, fecha: ultimaSync.toISOString()});
     setEstado(true,'Conectado al Sheet');
     document.getElementById('pantallaCarga').classList.add('hidden');
     await procesarCola(false);
@@ -498,6 +530,7 @@ function usarCacheLocal(){
   const c = leerLS(LS.cache, null);
   if(!c){ toast('No hay datos guardados en este equipo', false); return; }
   productos = c.productos||[]; movimientos = c.movimientos||[]; proveedores = c.proveedores||[]; catalogos = c.catalogos||[];
+  if(c.negocio) negocio = c.negocio;
   setEstado(false,'Sin conexión (datos locales)');
   document.getElementById('pantallaCarga').classList.add('hidden');
   if(!usuario) pedirUsuario(); else showView('dashboard');
@@ -509,8 +542,9 @@ async function recargarDesdeServidor(){
     if(!r || !r.ok) throw new Error(r && r.error ? r.error : 'Error del servidor');
     productos = r.productos||[]; movimientos = r.movimientos||[];
     proveedores = r.proveedores||[]; catalogos = r.catalogos||[];
+    if(r.negocio) negocio = r.negocio;
     ultimaSync = new Date();
-    guardarLS(LS.cache, {productos, movimientos, proveedores, catalogos, fecha: ultimaSync.toISOString()});
+    guardarLS(LS.cache, {productos, movimientos, proveedores, catalogos, negocio, fecha: ultimaSync.toISOString()});
     setEstado(true,'Conectado al Sheet');
     refrescarVistaActual();
   }catch(err){ setEstado(false,'Sin conexión'); toast('No se pudo actualizar: ' + err.message, false); }
@@ -617,6 +651,7 @@ function refrescarVistaActual(){
   if(v==='proveedores') renderProveedores();
   if(v==='entradas') renderEntradasView();
   if(v==='salidas') renderSalidasView();
+  if(v==='notas') renderNotas();
   if(v==='conteo') renderConteo();
   if(v==='movimientos') renderMovimientos();
   if(v==='reportes') renderReporteValuacion();
@@ -1059,10 +1094,17 @@ async function confirmarSalida(){
   try{
     const r = await apiEscribir('registrarSalida', payload);
     if(!r || !r.ok) throw new Error(r && r.error ? r.error : 'Error del servidor');
-    toast(`${r.folioVenta} guardada · ${money(r.total)}`);
+    const venta = {
+      folioVenta: r.folioVenta, fecha: todayISO(), cliente,
+      formaPago: payload.formaPago, usuario,
+      items: carrito.map(c=>({nombre:c.nombre, codigo:c.codigo, cantidad:c.cantidad, precioUnitario:c.precioUnitario, unidad:c.unidad})),
+      total: r.total
+    };
+    ultimaVenta = venta;
     limpiarCarrito();
     document.getElementById('posCliente').value = '';
     await recargarDesdeServidor();
+    mostrarNotaVenta(venta);
   }catch(err){
     encolar('registrarSalida', payload);
     setEstado(false,'Sin conexión');
@@ -1499,9 +1541,227 @@ function renderBitacora(){
     <tbody>${rows||'<tr><td colspan="5" class="text-center text-slate-400 py-6">Sin registros todavía</td></tr>'}</tbody>`;
 }
 
+
+/* ==================== NOTA DE VENTA (PDF) ====================
+   Nota simple de entrega, NO es comprobante fiscal: sin IVA desglosado. */
+
+function mostrarNotaVenta(v){
+  openModal(`<div class="p-5">
+    <div class="text-center mb-4">
+      <div class="text-4xl mb-2">✅</div>
+      <h3 class="font-black text-navy text-lg">${esc(v.folioVenta)} registrada</h3>
+      <p class="text-2xl font-black text-navy mt-1">${money(v.total)}</p>
+      <p class="text-xs text-slate-500">${v.items.length} producto(s)${v.cliente?' · '+esc(v.cliente):''}</p>
+    </div>
+    <p class="text-xs text-slate-500 mb-3 text-center">¿Quieres darle una nota al cliente?</p>
+    <div class="grid grid-cols-2 gap-2 mb-2">
+      <button class="btn btn-primary" onclick="descargarNotaPDF('${esc(v.folioVenta)}')">📄 Descargar PDF</button>
+      <button class="btn btn-yellow" onclick="compartirWhatsApp('${esc(v.folioVenta)}')">💬 WhatsApp</button>
+    </div>
+    <button class="btn btn-outline w-full" onclick="closeModal()">Continuar sin nota</button>
+  </div>`);
+}
+
+/** Arma la venta a partir de los movimientos ya guardados en el Sheet. */
+function ventaDesdeFolio(folioVenta){
+  if(ultimaVenta && ultimaVenta.folioVenta === folioVenta) return ultimaVenta;
+  const movs = movimientos.filter(m=>m.folioVenta === folioVenta && m.estatus !== 'Cancelado');
+  if(!movs.length) return null;
+  return {
+    folioVenta, fecha: movs[0].fecha, cliente: movs[0].cliente,
+    formaPago: movs[0].formaPago, usuario: movs[0].usuario,
+    items: movs.map(m=>{
+      const p = getProducto(m.productoId);
+      return {nombre:m.producto, codigo:m.codigo, cantidad:m.cantidad, precioUnitario:m.precioUnitario, unidad:p?p.unidad:''};
+    }),
+    total: movs.reduce((s,m)=>s+m.total,0)
+  };
+}
+
+/** Genera la nota en PDF, tamaño ticket (80mm de ancho). */
+function construirPDF(v){
+  const { jsPDF } = window.jspdf;
+  const alto = 90 + v.items.length * 12;
+  const doc = new jsPDF({unit:'mm', format:[80, Math.max(alto, 120)]});
+  const W = 80, M = 5;
+  let y = 10;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(negocio.negocioNombre || 'Modelorama - Prueba', W/2, y, {align:'center'}); y += 5;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  if(negocio.negocioDireccion){
+    doc.splitTextToSize(negocio.negocioDireccion, W-2*M).forEach(l=>{ doc.text(l, W/2, y, {align:'center'}); y += 3.2; });
+  }
+  if(negocio.negocioTelefono){ doc.text('Tel. ' + negocio.negocioTelefono, W/2, y, {align:'center'}); y += 3.2; }
+
+  y += 2;
+  doc.setLineWidth(0.2); doc.line(M, y, W-M, y); y += 4;
+
+  doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text('NOTA DE VENTA', W/2, y, {align:'center'}); y += 4;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  doc.text('Folio: ' + v.folioVenta, M, y); y += 3.2;
+  doc.text('Fecha: ' + formatoFechaLarga(v.fecha), M, y); y += 3.2;
+  if(v.cliente){ doc.text('Cliente: ' + v.cliente, M, y); y += 3.2; }
+  if(v.formaPago){ doc.text('Pago: ' + v.formaPago, M, y); y += 3.2; }
+
+  y += 1; doc.line(M, y, W-M, y); y += 4;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
+  doc.text('CANT  DESCRIPCIÓN', M, y);
+  doc.text('IMPORTE', W-M, y, {align:'right'}); y += 3;
+  doc.line(M, y, W-M, y); y += 3.5;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(7);
+  v.items.forEach(it=>{
+    const lineas = doc.splitTextToSize(it.nombre, 42);
+    doc.text(String(it.cantidad), M, y);
+    doc.text(lineas[0], M + 8, y);
+    doc.text(money(it.cantidad * it.precioUnitario), W-M, y, {align:'right'});
+    y += 3.4;
+    for(let i=1;i<lineas.length;i++){ doc.text(lineas[i], M+8, y); y += 3.2; }
+    doc.setFontSize(6); doc.setTextColor(120);
+    doc.text(money(it.precioUnitario) + ' c/u', M+8, y);
+    doc.setTextColor(0); doc.setFontSize(7);
+    y += 4;
+  });
+
+  y += 1; doc.line(M, y, W-M, y); y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text('TOTAL', M, y);
+  doc.text(money(v.total), W-M, y, {align:'right'}); y += 6;
+
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5);
+  const articulos = v.items.reduce((s,i)=>s+i.cantidad,0);
+  doc.text(articulos + ' artículo(s) · Atendió: ' + (v.usuario||''), W/2, y, {align:'center'}); y += 5;
+
+  if(negocio.negocioMensaje){
+    doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text(negocio.negocioMensaje, W/2, y, {align:'center'}); y += 5;
+  }
+  doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(130);
+  doc.text('Este documento no es un comprobante fiscal.', W/2, y, {align:'center'});
+  return doc;
+}
+
+function formatoFechaLarga(f){
+  try{
+    const d = new Date(f + 'T12:00:00');
+    return d.toLocaleDateString('es-MX', {day:'2-digit', month:'long', year:'numeric'});
+  }catch(e){ return f; }
+}
+
+async function descargarNotaPDF(folioVenta){
+  const v = ventaDesdeFolio(folioVenta);
+  if(!v){ toast('No se encontró esa venta', false); return; }
+  try{
+    construirPDF(v).save(`Nota_${v.folioVenta}.pdf`);
+    toast('Nota descargada');
+    apiEscribir('registrarNota', {folioVenta:v.folioVenta, total:v.total, cliente:v.cliente, via:'pdf'}).catch(()=>{});
+    closeModal();
+  }catch(err){ toast('No se pudo generar el PDF: ' + err.message, false); }
+}
+
+/** Comparte por WhatsApp. En celular abre el menú para adjuntar el PDF;
+    en computadora se descarga el PDF y se abre WhatsApp con el texto. */
+async function compartirWhatsApp(folioVenta){
+  const v = ventaDesdeFolio(folioVenta);
+  if(!v){ toast('No se encontró esa venta', false); return; }
+
+  const texto = armarTextoNota(v);
+  apiEscribir('registrarNota', {folioVenta:v.folioVenta, total:v.total, cliente:v.cliente, via:'whatsapp'}).catch(()=>{});
+
+  try{
+    const doc = construirPDF(v);
+    const blob = doc.output('blob');
+    const archivo = new File([blob], `Nota_${v.folioVenta}.pdf`, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[archivo]})){
+      await navigator.share({files:[archivo], title:'Nota ' + v.folioVenta, text:texto});
+      closeModal();
+      return;
+    }
+    doc.save(`Nota_${v.folioVenta}.pdf`);
+  }catch(err){ /* si falla el PDF, al menos va el texto */ }
+
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  closeModal();
+}
+
+function armarTextoNota(v){
+  let t = '*' + (negocio.negocioNombre||'Modelorama - Prueba') + '*\n';
+  t += 'Nota ' + v.folioVenta + ' · ' + formatoFechaLarga(v.fecha) + '\n';
+  if(v.cliente) t += 'Cliente: ' + v.cliente + '\n';
+  t += '\n';
+  v.items.forEach(i=>{
+    t += i.cantidad + ' x ' + i.nombre + '  ' + money(i.cantidad*i.precioUnitario) + '\n';
+  });
+  t += '\n*TOTAL: ' + money(v.total) + '*';
+  if(v.formaPago) t += '\nPago: ' + v.formaPago;
+  if(negocio.negocioMensaje) t += '\n\n' + negocio.negocioMensaje;
+  return t;
+}
+
+/* ==================== HISTORIAL DE NOTAS ==================== */
+function ventasAgrupadas(){
+  const g = {};
+  movimientos.filter(m=>m.folioVenta && m.estatus!=='Cancelado').forEach(m=>{
+    if(!g[m.folioVenta]) g[m.folioVenta] = {folioVenta:m.folioVenta, fecha:m.fecha, cliente:m.cliente,
+      formaPago:m.formaPago, usuario:m.usuario, subtipo:m.subtipo, items:0, total:0};
+    g[m.folioVenta].items++; g[m.folioVenta].total += m.total;
+  });
+  return Object.values(g).sort((a,b)=>b.folioVenta.localeCompare(a.folioVenta));
+}
+function renderNotas(){
+  const d = document.getElementById('fNotaDesde')?.value, h = document.getElementById('fNotaHasta')?.value;
+  const q = (document.getElementById('fNotaBuscar')?.value||'').toLowerCase();
+  const list = ventasAgrupadas().filter(v=>{
+    if(d && v.fecha < d) return false;
+    if(h && v.fecha > h) return false;
+    if(q && !((v.folioVenta + (v.cliente||'')).toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const rows = list.map(v=>`<tr>
+    <td class="font-mono text-xs font-bold">${esc(v.folioVenta)}</td>
+    <td>${esc(v.fecha)}</td><td>${esc(v.subtipo||'Venta')}</td>
+    <td>${esc(v.cliente||'—')}</td><td>${v.items}</td>
+    <td class="font-bold">${money(v.total)}</td>
+    <td>${esc(v.formaPago||'—')}</td><td>${esc(v.usuario)}</td>
+    <td class="no-print">
+      <button class="text-navy underline text-xs mr-3" onclick="descargarNotaPDF('${esc(v.folioVenta)}')">PDF</button>
+      <button class="text-green-700 underline text-xs" onclick="compartirWhatsApp('${esc(v.folioVenta)}')">WhatsApp</button>
+    </td></tr>`).join('');
+  const total = list.reduce((s,v)=>s+v.total,0);
+  document.getElementById('tblNotas').innerHTML = `
+    <thead><tr><th>Folio</th><th>Fecha</th><th>Tipo</th><th>Cliente</th><th>Artículos</th><th>Total</th><th>Pago</th><th>Atendió</th><th class="no-print">Nota</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="9" class="text-center text-slate-400 py-6">Sin ventas registradas</td></tr>'}</tbody>
+    ${list.length?`<tfoot><tr><td colspan="5" class="font-bold text-right">Total del periodo</td><td class="font-black text-navy">${money(total)}</td><td colspan="3"></td></tr></tfoot>`:''}`;
+}
+
+/* ==================== DATOS DEL NEGOCIO ==================== */
+async function guardarNegocio(){
+  const payload = {
+    negocioNombre: document.getElementById('cfgNegNombre').value.trim(),
+    negocioDireccion: document.getElementById('cfgNegDireccion').value.trim(),
+    negocioTelefono: document.getElementById('cfgNegTelefono').value.trim(),
+    negocioMensaje: document.getElementById('cfgNegMensaje').value.trim()
+  };
+  cargando('btnGuardarNegocio', true);
+  try{
+    const r = await apiEscribir('guardarNegocio', payload);
+    if(!r || !r.ok) throw new Error(r && r.error ? r.error : 'Error');
+    negocio = r.negocio; toast('Datos guardados');
+  }catch(err){ toast('Error: '+err.message, false); }
+  cargando('btnGuardarNegocio', false, 'Guardar datos');
+}
+
 /* ==================== CONFIGURACIÓN ==================== */
 function renderConfigView(){
   document.getElementById('cfgApiUrl').value = apiUrl;
+  document.getElementById('cfgNegNombre').value = negocio.negocioNombre||'';
+  document.getElementById('cfgNegDireccion').value = negocio.negocioDireccion||'';
+  document.getElementById('cfgNegTelefono').value = negocio.negocioTelefono||'';
+  document.getElementById('cfgNegMensaje').value = negocio.negocioMensaje||'';
   document.getElementById('infoProductos').textContent = productos.length;
   document.getElementById('infoProveedores').textContent = proveedores.length;
   document.getElementById('infoMovimientos').textContent = movimientos.length;

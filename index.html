@@ -137,6 +137,13 @@
 
   <main class="flex-1 min-h-screen p-4 lg:p-8 max-w-[1400px] mx-auto w-full">
 
+    <div id="avisoVersion" class="hidden mb-4 rounded-lg border-l-4 border-red-500 bg-red-50 px-4 py-3 no-print">
+      <p class="text-sm font-bold text-red-800">⚠️ El Apps Script está desactualizado</p>
+      <p class="text-xs text-red-700 mt-1" id="avisoVersionTexto"></p>
+      <p class="text-xs text-red-700 mt-2">Los botones de eliminar y las listas no van a funcionar hasta que lo actualices:
+      abre el Apps Script → <b>Implementar → Administrar implementaciones → ✏️ → Versión: Nueva versión → Implementar</b>.</p>
+    </div>
+
     <div id="avisoPendientes" class="hidden mb-4 rounded-lg border-l-4 border-yellow bg-yellow-50 px-4 py-3 no-print">
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -462,6 +469,7 @@
    y queda además en la hoja Bitacora con usuario, fecha y detalle. */
 
 const API_URL_DEFAULT = 'https://script.google.com/macros/s/AKfycbzeWYCqH5Gyf-UB2j1SWizr3Luidk0AptPwiMCF3kZUUs47QHMEEM8ccGeNjVQZhFjOsQ/exec';
+const VERSION_ESPERADA = '4.0';
 const LS = { cache:'modelorama_cache', cola:'modelorama_cola', usuario:'modelorama_usuario', apiUrl:'modelorama_api_url' };
 
 let apiUrl = leerLS(LS.apiUrl, API_URL_DEFAULT);
@@ -496,6 +504,20 @@ function jsonp(params, timeoutMs){
 const apiLeer = a => jsonp({accion: a || 'bootstrap'});
 const apiEscribir = (tipo, payload) => jsonp({accion:'escribir', datos: JSON.stringify({tipo, payload: {...payload, usuario}})});
 
+/** Compara la versión del backend con la que espera esta página.
+    Un despliegue viejo es la causa #1 de "el botón no hace nada". */
+function revisarVersion(v){
+  const aviso = document.getElementById('avisoVersion');
+  if(!aviso) return;
+  const desactualizado = !v || v !== VERSION_ESPERADA;
+  aviso.classList.toggle('hidden', !desactualizado);
+  if(desactualizado){
+    document.getElementById('avisoVersionTexto').textContent =
+      `Esta página necesita la versión ${VERSION_ESPERADA}, pero el servidor está corriendo ` +
+      (v ? `la ${v}` : 'una versión anterior') + '.';
+  }
+}
+
 function setEstado(ok, texto){
   enLinea = ok;
   document.getElementById('estadoDot').className = 'dot ' + (ok?'bg-green-400':'bg-red-400');
@@ -512,6 +534,7 @@ async function iniciar(){
     productos = r.productos||[]; movimientos = r.movimientos||[];
     proveedores = r.proveedores||[]; catalogos = r.catalogos||[];
     if(r.negocio) negocio = r.negocio;
+    revisarVersion(r.version);
     ultimaSync = new Date();
     guardarLS(LS.cache, {productos, movimientos, proveedores, catalogos, negocio, fecha: ultimaSync.toISOString()});
     setEstado(true,'Conectado al Sheet');
